@@ -22,6 +22,7 @@ constexpr uint32_t SAMPLE_RATE = 2000000U;
 constexpr size_t READ_LEN = 262144;
 constexpr double PI = 3.14159265358979323846;
 
+// Structure to hold aircraft data
 struct Aircraft {
     std::string hex;
     std::string tailnumber;
@@ -35,6 +36,7 @@ struct Aircraft {
     std::chrono::steady_clock::time_point even_time{}, odd_time{}, last_seen{};
 };
 
+// Extract a specified number of bits from a message starting at a given bit position
 uint32_t getBits(const uint8_t* msg, int start, int count) {
     uint32_t v = 0;
     for (int i = 0; i < count; ++i) {
@@ -44,12 +46,14 @@ uint32_t getBits(const uint8_t* msg, int start, int count) {
     return v;
 }
 
+// Convert a 24-bit integer to a 6-digit uppercase hexadecimal string
 std::string hexString(uint32_t v) {
     std::ostringstream s;
     s << std::uppercase << std::hex << std::setw(6) << std::setfill('0') << v;
     return s.str();
 }
 
+// Compute the CRC24 of a message with a given number of bits
 uint32_t crc24(const uint8_t* msg, int bits) {
     uint32_t rem = 0;
     for (int i = 0; i < bits; ++i) {
@@ -61,10 +65,12 @@ uint32_t crc24(const uint8_t* msg, int bits) {
     return rem & 0xFFFFFF;
 }
 
+// Check if a Type Code 17 message has a valid CRC
 bool validDF17(const uint8_t* msg) {
     return crc24(msg, 112) == 0;
 }
 
+// Decode the tail number from a Type Code 1-4 message
 std::string decodetailnumber(const uint8_t* msg) {
     static const char charset[65] =
         "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????";
@@ -81,6 +87,7 @@ std::string decodetailnumber(const uint8_t* msg) {
     return out.substr(first);
 }
 
+// Decode altitude in feet from a Type Code 9-18 or 20-22 message
 int decodeAltitudeFeet(const uint8_t* msg) {
     uint32_t ac12 = getBits(msg, 40, 12);
     if (ac12 == 0) return 0;
@@ -91,6 +98,7 @@ int decodeAltitudeFeet(const uint8_t* msg) {
     return 0;
 }
 
+// Compute the number of latitude zones (NL) for a given latitude in degrees
 double cprNL(double lat) {
     if (lat < 0) lat = -lat;
     if (lat >= 87.0) return 1.0;
@@ -103,6 +111,8 @@ double cprNL(double lat) {
     return std::floor(2.0 * PI / std::acos(x));
 }
 
+
+// Decode global CPR position from even and odd messages and update the aircraft data
 bool decodeGlobalCPR(Aircraft& a) {
     using clock = std::chrono::steady_clock;
     if (a.even_time.time_since_epoch().count() == 0 ||
@@ -136,6 +146,7 @@ bool decodeGlobalCPR(Aircraft& a) {
     return true;
 }
 
+// Decode velocity information from a Type Code 19 message and update the aircraft data
 void decodeVelocity(Aircraft& a, const uint8_t* msg) {
     int tc = static_cast<int>(getBits(msg, 32, 5));
     if (tc != 19) return;
@@ -163,6 +174,7 @@ void decodeVelocity(Aircraft& a, const uint8_t* msg) {
     }
 }
 
+// Update aircraft data in the airspace map based on the received message
 void updateAircraft(const uint8_t* msg, std::map<std::string, Aircraft>& airspace) {
     uint32_t icao = getBits(msg, 8, 24);
     std::string hex = hexString(icao);
@@ -194,6 +206,8 @@ void updateAircraft(const uint8_t* msg, std::map<std::string, Aircraft>& airspac
     }
 }
 
+
+// Convert a double to a string with fixed precision, or "N/A" if not finite
 std::string val(double x, int precision = 4) {
     if (!std::isfinite(x)) return "N/A";
     std::ostringstream s;
@@ -201,6 +215,7 @@ std::string val(double x, int precision = 4) {
     return s.str();
 }
 
+// Print a table of aircraft data to the console
 void printTable(const std::map<std::string, Aircraft>& airspace) {
     std::cout << "\033[2J\033[H";
     std::cout << "RTL-SDR ADS-B receiver | 1090 MHz | " << airspace.size()
@@ -228,6 +243,7 @@ void printTable(const std::map<std::string, Aircraft>& airspace) {
     std::cout << "\nPress Ctrl+C to quit.\n" << std::flush;
 }
 
+// Convert interleaved I/Q samples to magnitudes
 std::vector<uint8_t> magnitudes(const uint8_t* iq, size_t n) {
     std::vector<uint8_t> mag(n / 2);
     for (size_t i = 0; i < n; i += 2) {
@@ -239,6 +255,7 @@ std::vector<uint8_t> magnitudes(const uint8_t* iq, size_t n) {
     return mag;
 }
 
+// Detect the preamble of an ADS-B message in the magnitude data
 bool detectPreamble(const std::vector<uint8_t>& s, size_t i) {
     if (i + 16 >= s.size()) return false;
     int p0 = s[i], p1 = s[i + 2], p2 = s[i + 7], p3 = s[i + 9];
@@ -249,6 +266,7 @@ bool detectPreamble(const std::vector<uint8_t>& s, size_t i) {
            p1 > g2 * 1.35 && p2 > g3 * 1.35 && p3 > g4 * 1.25;
 }
 
+// Decode an ADS-B frame from the magnitude data starting at a given index
 bool decodeFrame(const std::vector<uint8_t>& s, size_t start, uint8_t msg[14], int& length) {
     if (start + 16 + 112 * 2 > s.size()) return false;
     uint8_t first = 0;
@@ -267,13 +285,58 @@ bool decodeFrame(const std::vector<uint8_t>& s, size_t start, uint8_t msg[14], i
     }
     return true;
 }
+
+// Convert the airspace data to a JSON string representation
+std::string jsonOut(const std::map<std::string, Aircraft>& airspace) {
+    std::ostringstream s;
+    s << "[";
+    bool first = true;
+    for (const auto& kv : airspace) {
+        const Aircraft& a = kv.second;
+        if (!first) s << ",";
+        s << "{"
+          << "\"hex\":\"" << a.hex << "\","
+          << "\"tailnumber\":\"" << (a.tailnumber.empty() ? "" : a.tailnumber) << "\","
+          << "\"latitude\":" << (a.has_position ? val(a.lat) : "null") << ","
+          << "\"longitude\":" << (a.has_position ? val(a.lon) : "null") << ","
+          << "\"altitude\":" << (a.has_altitude ? std::to_string(a.altitude) : "null") << ","
+          << "\"velocity\":" << (a.has_velocity ? val(a.velocity, 0) : "null")
+          << "}";
+        first = false;
+    }
+    s << "]";
+
+    return s.str();
 }
 
+} // end namespace
+
+
 int main(int argc, char** argv) {
+
+    //Check for arguments for API use or local use
+    bool web_mode = false;
+    bool view_mode = false;
     uint32_t frequency = DEFAULT_FREQ;
     int gain_tenth_db = 0;
-    if (argc > 1) frequency = static_cast<uint32_t>(std::strtoul(argv[1], nullptr, 10));
-    if (argc > 2) gain_tenth_db = std::atoi(argv[2]);
+
+    int positional_arg = 0;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--web") web_mode = true;
+        else if (arg == "--view") view_mode = true;
+        else if (positional_arg == 0) {
+            frequency = static_cast<uint32_t>(std::strtoul(argv[i], nullptr, 10));
+            ++positional_arg;
+        } else if (positional_arg == 1) {
+            gain_tenth_db = std::atoi(argv[i]);
+            ++positional_arg;
+        }
+    }
+    if(!web_mode && !view_mode) {
+        view_mode = true;
+    }
+
 
     int count = rtlsdr_get_device_count();
     if (count == 0) {
@@ -293,8 +356,9 @@ int main(int argc, char** argv) {
     if (gain_tenth_db != 0) rtlsdr_set_tuner_gain(dev, gain_tenth_db);
     rtlsdr_reset_buffer(dev);
 
-    std::cout << "Using RTL-SDR at " << frequency / 1e6 << " MHz, sample rate "
-              << SAMPLE_RATE / 1e6 << " MS/s\n";
+    std::ostream& status = web_mode ? std::cerr : std::cout;
+    status << "Using RTL-SDR at " << frequency / 1e6 << " MHz, sample rate "
+           << SAMPLE_RATE / 1e6 << " MS/s\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(700));
 
     std::map<std::string, Aircraft> airspace;
@@ -331,7 +395,13 @@ int main(int argc, char** argv) {
                     it = airspace.erase(it);
                 else ++it;
             }
-            printTable(airspace);
+            
+            if (view_mode) {
+                printTable(airspace);
+            } else if (web_mode) {
+                std::cout << jsonOut(airspace) << std::endl;
+            }
+
             last_print = now;
             frames_since_print = 0;
         }
