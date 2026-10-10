@@ -319,8 +319,12 @@ bool toFastAPI(const std::string & json){
 
     struct curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    // This does not matter for most operations, but the URL can be useful if the server is running on a different host.
     const char* api_url = std::getenv("ADSB_API_URL");
     if (!api_url || !*api_url) api_url = "http://127.0.0.1:8000/aircraft";
+
+    //This variable must always be set in the environment for the API to work. It is not used for local viewing.
     const char* api_token = std::getenv("ADSB_API_TOKEN");
     if (api_token && *api_token) {
         std::string auth_header = std::string("Authorization: Bearer ") + api_token;

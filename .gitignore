@@ -1,4 +1,6 @@
 .vscode
 .venv
 .env
+.deploy
 __pycache__
+adsb_tracker
