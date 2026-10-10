@@ -426,7 +426,7 @@ int main(int argc, char** argv) {
             i += 15;  }
 
         auto now = std::chrono::steady_clock::now();
-        if (now - last_print >= std::chrono::milliseconds(500)) {
+        if (now - last_print >= std::chrono::seconds(2)) {
             for (auto it = airspace.begin(); it != airspace.end();) {
                 if (now - it->second.last_seen > std::chrono::seconds(60))
                     it = airspace.erase(it);
