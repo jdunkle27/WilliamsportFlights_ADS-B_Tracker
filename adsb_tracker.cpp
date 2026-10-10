@@ -1,5 +1,4 @@
 #include <rtl-sdr.h>
-
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -15,6 +14,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <curl/curl.h>
+#include <cstdlib>
 
 namespace {
 constexpr uint32_t DEFAULT_FREQ = 1090000000U;
@@ -309,6 +310,42 @@ std::string jsonOut(const std::map<std::string, Aircraft>& airspace) {
     return s.str();
 }
 
+bool toFastAPI(const std::string & json){
+    CURL *curl = curl_easy_init();
+    if (!curl) {
+        std::cerr << "CURL failed to start." << std::endl;
+        return false;
+    }
+
+    struct curl_slist *headers = nullptr;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    char curl_error[CURL_ERROR_SIZE] = {};
+    curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:8000/aircraft");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json.c_str());
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_error);
+    
+    CURLcode res = curl_easy_perform(curl);
+    long status_code = 0;
+
+    if (res == CURLE_OK) {
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status_code);
+    } else {
+        std::cerr << "FastAPI request failed: "
+                  << (curl_error[0] ? curl_error : curl_easy_strerror(res)) << '\n';
+    }
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res == CURLE_OK && (status_code < 200 || status_code >= 300)) {
+        std::cerr << "FastAPI returned HTTP " << status_code << ".\n";
+    }
+
+    return (res == CURLE_OK && status_code >= 200 && status_code < 300);
+}
+
 } // end namespace
 
 
@@ -399,7 +436,13 @@ int main(int argc, char** argv) {
             if (view_mode) {
                 printTable(airspace);
             } else if (web_mode) {
-                std::cout << jsonOut(airspace) << std::endl;
+                std::string json = jsonOut(airspace);
+                if (toFastAPI(json)) {
+                    std::cerr << "Data sent to FastAPI successfully.\n";
+                }
+                else {
+                    std::cerr << "Failed to send data to FastAPI.\n";
+                }
             }
 
             last_print = now;
