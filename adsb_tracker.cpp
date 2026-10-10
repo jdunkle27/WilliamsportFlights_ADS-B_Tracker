@@ -319,8 +319,15 @@ bool toFastAPI(const std::string & json){
 
     struct curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+    const char* api_url = std::getenv("ADSB_API_URL");
+    if (!api_url || !*api_url) api_url = "http://127.0.0.1:8000/aircraft";
+    const char* api_token = std::getenv("ADSB_API_TOKEN");
+    if (api_token && *api_token) {
+        std::string auth_header = std::string("Authorization: Bearer ") + api_token;
+        headers = curl_slist_append(headers, auth_header.c_str());
+    }
     char curl_error[CURL_ERROR_SIZE] = {};
-    curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:8000/aircraft");
+    curl_easy_setopt(curl, CURLOPT_URL, api_url);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json.c_str());
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
