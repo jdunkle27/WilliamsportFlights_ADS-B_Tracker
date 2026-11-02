@@ -233,19 +233,22 @@ void printTable(const std::map<std::string, Aircraft>& airspace) {
               << std::setw(13) << "latitude"
               << std::setw(14) << "longitude"
               << std::setw(13) << "altitude"
-              << std::setw(12) << "velocity" << '\n';
-    std::cout << std::string(79, '-') << '\n';
+              << std::setw(12) << "velocity"
+              << std::setw(12) << "rotation" << '\n';
+    std::cout << std::string(95, '-') << '\n';
     for (const auto& kv : airspace) {
         const Aircraft& a = kv.second;
         std::string alt = a.has_altitude ? std::to_string(a.altitude) + " ft" : "N/A";
         std::string vel = a.has_velocity ? val(a.velocity, 0) + " kt" : "N/A";
+        std::string rot = a.has_rotation ? val(a.rotation, 0) + "°" : "N/A";
         std::cout << std::left
                   << std::setw(9) << a.hex
                   << std::setw(18) << (a.tailnumber.empty() ? "N/A" : a.tailnumber)
                   << std::setw(13) << val(a.lat)
                   << std::setw(14) << val(a.lon)
                   << std::setw(13) << alt
-                  << std::setw(12) << vel << '\n';
+                  << std::setw(12) << vel
+                  << std::setw(12) << rot << '\n';
     }
     std::cout << "\nPress Ctrl+C to quit.\n" << std::flush;
 }
