@@ -165,6 +165,13 @@ void decodeVelocity(Aircraft& a, const uint8_t* msg) {
         double north = (ns - 1) * factor * (ns_sign ? -1.0 : 1.0);
         a.velocity = std::sqrt(east * east + north * north);
         a.has_velocity = true;
+
+        double heading = std::atan2(east, north) * 180.0 / PI;
+        if (heading < 0.0) heading += 360.0;
+        if (std::isfinite(heading)) {
+            a.rotation = heading;
+            a.has_rotation = true;
+        }
     } else if (subtype == 3 || subtype == 4) {
         int heading_status = static_cast<int>(getBits(msg, 45, 1));
         int heading = static_cast<int>(getBits(msg, 46, 10));
