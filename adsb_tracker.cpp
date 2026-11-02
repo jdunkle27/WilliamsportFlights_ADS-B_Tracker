@@ -29,9 +29,11 @@ struct Aircraft {
     std::string tailnumber;
     double lat = NAN, lon = NAN;
     double velocity = NAN;
+    double rotation = NAN;
     int altitude = 0;
     bool has_altitude = false;
     bool has_velocity = false;
+    bool has_rotation = false;
     bool has_position = false;
     int even_lat = 0, even_lon = 0, odd_lat = 0, odd_lon = 0;
     std::chrono::steady_clock::time_point even_time{}, odd_time{}, last_seen{};
@@ -167,11 +169,15 @@ void decodeVelocity(Aircraft& a, const uint8_t* msg) {
         int heading_status = static_cast<int>(getBits(msg, 45, 1));
         int heading = static_cast<int>(getBits(msg, 46, 10));
         int airspeed = static_cast<int>(getBits(msg, 57, 10));
+        if (heading_status) {
+            a.rotation = std::fmod((heading * 360.0) / 1024.0, 360.0);
+            if (a.rotation < 0.0) a.rotation += 360.0;
+            a.has_rotation = true;
+        }
         if (heading_status && airspeed > 0) {
             a.velocity = airspeed - 1;
             a.has_velocity = true;
         }
-        (void)heading;
     }
 }
 
@@ -301,6 +307,7 @@ std::string jsonOut(const std::map<std::string, Aircraft>& airspace) {
           << "\"latitude\":" << (a.has_position ? val(a.lat) : "null") << ","
           << "\"longitude\":" << (a.has_position ? val(a.lon) : "null") << ","
           << "\"altitude\":" << (a.has_altitude ? std::to_string(a.altitude) : "null") << ","
+          << "\"rotation\":" << (a.has_rotation ? val(a.rotation, 0) : "null") << ","
           << "\"velocity\":" << (a.has_velocity ? val(a.velocity, 0) : "null")
           << "}";
         first = false;

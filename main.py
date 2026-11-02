@@ -16,6 +16,7 @@ class Aircraft(BaseModel):
     longitude: Optional[float]
     latitude: Optional[float]
     altitude: Optional[float]
+    rotation: Optional[float]
     velocity: Optional[float]
 
 latest_aircraft: list[Aircraft] = []
