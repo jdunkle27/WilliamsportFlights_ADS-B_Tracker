@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Header, HTTPException
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 app = FastAPI()
+logger = logging.getLogger(__name__)
 #api_token = os.getenv("ADSB_API_TOKEN")
 #if not api_token:
 #    raise RuntimeError("ADSB_API_TOKEN must be set before starting the API")
@@ -95,6 +97,7 @@ def receive_aircraft(
     try:
         save_aircraft(aircraft)
     except mysql.connector.Error as exc:
+        logger.exception("MariaDB write failed")
         raise HTTPException(status_code=503, detail="MariaDB write failed") from exc
 
     latest_aircraft[:] = aircraft
