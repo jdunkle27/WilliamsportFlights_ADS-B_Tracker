@@ -1,6 +1,6 @@
 CXX ?= g++
 PKG_CONFIG ?= pkg-config
-TARGET ?= adsb_tracker
+TARGET ?= build/adsb_tracker
 SOURCE := adsb_tracker.cpp
 
 RTLSDR_CFLAGS := $(shell $(PKG_CONFIG) --cflags librtlsdr 2>/dev/null)
@@ -17,8 +17,11 @@ LDLIBS += $(RTLSDR_LIBS) $(CURL_LIBS) -pthread
 
 all: $(TARGET)
 
-$(TARGET): $(SOURCE)
+$(TARGET): $(SOURCE) | build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 
+build:
+	mkdir -p $@
+
 clean:
-	rm -f $(TARGET)
+	rm -rf build
